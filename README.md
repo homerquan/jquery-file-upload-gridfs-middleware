@@ -2,6 +2,7 @@ jquery-file-upload-gridfs-middleware
 =============================
 
 jquery-file-upload-gridfs-middleware. Based on https://github.com/aguidrevitch/jquery-file-upload-middleware
+It uploads the uploads into a temporary dir ('uploadDir' in options) then stream into gridfs and remove the tempory file. 
 
 * Add a new handler to store file into mongo gridfs
 
@@ -40,7 +41,7 @@ Usage:
 
     app.configure(function () {
         ...
-        app.use('/upload', upload.fileHandler());
+        app.use('/upload', upload.gridFsHandler());
         app.use(express.bodyParser());
         ...
     });
@@ -75,13 +76,9 @@ app.delete('/upload', function( req, res ){
 });
 
 app.use('/upload', function(req, res, next){
-    upload.fileHandler({
-        uploadDir: function () {
-            return __dirname + '/public/uploads/'
-        },
-        uploadUrl: function () {
-            return '/uploads'
-        }
+    upload.gridFsHandler({
+        uploadDir: __dirname + '/public/uploads',
+        mongoGfs: gfs
     })(req, res, next);
 });
 ```
@@ -90,15 +87,9 @@ Overriding global configuration
 
 ```javascript
 
-    app.use('/upload2', upload.fileHandler({
-        uploadDir: __dirname + '/public/uploads2',
-        uploadUrl: '/uploads2',
-        imageVersions: {
-            thumbnail: {
-                width: 100,
-                height: 100
-            }
-        }
+    app.use('/upload2', upload.gridFsHandler({
+        uploadDir: __dirname + '/public/uploads',
+        mongoGfs: gfs
     }));
 
 ```
@@ -106,7 +97,7 @@ Overriding global configuration
 More sophisticated example - Events
 
 ```javascript
-        app.use('/upload', upload.fileHandler());
+        app.use('/upload', upload.gridFsHandler());
 
         // events
         upload.on('begin', function (fileInfo, req, res) { 
@@ -144,113 +135,18 @@ Dynamic upload directory and url, isolating user files:
 
         app.use('/upload', function (req, res, next) {
             // imageVersions are taken from upload.configure()
-            upload.fileHandler({
+           upload.gridFsHandlerr({
                 uploadDir: function () {
                     return __dirname + '/public/uploads/' + req.sessionID
                 },
                 uploadUrl: function () {
                     return '/uploads/' + req.sessionID
-                }
+                },
+                mongoGfs: gfs
             })(req, res, next);
         });
 ```
 
-Moving uploaded files to different dir:
-
-```javascript
-        app.use('/api', function (req, res, next) {
-            req.filemanager = upload.fileManager();
-            next();
-        });
-
-        app.use('/api/endpoint', function (req, res, next) {
-            // your real /api handler that will actually move the file
-            ...
-            // req.filemanager.move(filename, path, function (err, result))
-            req.filemanager.move('SomeFile.jpg', 'project1', function (err, result) {
-                // SomeFile.jpg gets moved from uploadDir/SomeFile.jpg to
-                // uploadDir/project1/SomeFile.jpg
-                // if path is relative (no leading slash), uploadUrl will
-                // be used to generate relevant urls,
-                // for absolute paths urls are not generated
-                if (!err) {
-                    // result structure
-                    // {
-                    //     filename: 'SomeFile.jpg',
-                    //     url: '/uploads/project1/SomeFile.jpg',
-                    //     thumbail_url : '/uploads/project1/thumbnail/SomeFile.jpg'
-                    // }
-                    ...
-                } else {
-                    console.log(err);
-                }
-            });
-        });
-```
-
-Moving uploaded files out of uploadDir:
-
-```
-        app.use('/api', function (req, res, next) {
-            var user = db.find(...);
-
-            req.filemanager = upload.fileManager({
-                targetDir: __dirname + '/public/u/' + user._id,
-                targetUrl: '/u/' + user._id,
-            });
-
-            // or
-            req.filemanager = upload.fileManager({
-                targetDir: function () {
-                    return __dirname + '/public/u/' + user._id
-                },
-                targetUrl: function () {
-                    return'/u/' + user._id
-                }
-            });
-            ...
-            req.filemanager.move(req.body.filename, 'profile', function (err, result) {
-                // file gets moved to __dirname + '/public/u/' + user._id + '/profile'
-                if (!err) {
-
-                }
-            });
-        });
-```
-
-Getting uploaded files mapped to their fs locations:
-
-```javascript
-        app.use('/list', function (req, res, next) {
-            upload.fileManager().getFiles(function (files) {
-                //  {
-                //      "00001.MTS": {
-                //          "path": "/home/.../public/uploads/ekE6k4j9PyrGtcg+SA6a5za3/00001.MTS"
-                //      },
-                //      "DSC00030.JPG": {
-                //          "path": "/home/.../public/uploads/ekE6k4j9PyrGtcg+SA6a5za3/DSC00030.JPG",
-                //          "thumbnail": "/home/.../public/uploads/ekE6k4j9PyrGtcg+SA6a5za3/thumbnail/DSC00030.JPG"
-                //      }
-                //  }
-                res.json(files);
-            });
-        });
-
-        // with dynamic upload directories
-
-        app.use('/list', function (req, res, next) {
-            upload.fileManager({
-                uploadDir: function () {
-                    return __dirname + '/public/uploads/' + req.sessionID
-                },
-                uploadUrl: function () {
-                    return '/uploads/' + req.sessionID
-                }
-            }).getFiles(function (files) {
-                res.json(files);
-            });
-        });
-```
 
 Other options and their default values:
 
