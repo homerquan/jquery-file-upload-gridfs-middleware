@@ -285,7 +285,7 @@ Other options and their default values:
 
 ## Contributors
 
-   * [@homerquan] [http://github.com/homerquan] 
+   * [@homerquan](http://github.com/homerquan)
    * [@soomtong](http://github.com/soomtong)
    * [@gsarwohadi](https://github.com/gsarwohadi)
    * [@peecky](https://github.com/peecky)
